@@ -1,12 +1,16 @@
 /**
  * CORTEX V2 — Embedding Engine
  *
- * Supports two providers:
+ * Supports three providers:
  *   - "ollama" (default): Local inference via mxbai-embed-large (1024-dim)
  *   - "voyage": VoyageAI API (voyage-3, 1024-dim)
+ *   - "local": In-process CPU inference, zero external services (512-dim,
+ *     zero-padded to 1024 — padding preserves cosine similarity exactly).
+ *     Model weights ship via npm, so it works fully offline: no API keys,
+ *     no Ollama daemon, no model downloads at runtime.
  *
  * Configure via env:
- *   EMBEDDING_PROVIDER=ollama|voyage (default: ollama)
+ *   EMBEDDING_PROVIDER=ollama|voyage|local (default: ollama)
  *   EMBEDDING_MODEL=mxbai-embed-large|voyage-3 (auto-set per provider)
  *   OLLAMA_URL=http://localhost:11434
  *   VOYAGE_API_KEY=pa-...
@@ -18,7 +22,11 @@ const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY || "";
 const EMBEDDING_MODEL =
   process.env.EMBEDDING_MODEL ||
-  (EMBEDDING_PROVIDER === "voyage" ? "voyage-3" : "mxbai-embed-large");
+  (EMBEDDING_PROVIDER === "voyage"
+    ? "voyage-3"
+    : EMBEDDING_PROVIDER === "local"
+      ? "energetic-ai/model-embeddings-en"
+      : "mxbai-embed-large");
 const EMBEDDING_DIM = 1024;
 const BATCH_SIZE = 32;
 
@@ -142,6 +150,57 @@ async function voyageEmbedQuery(text: string): Promise<number[]> {
   });
 }
 
+// ─── Local Provider (in-process, offline) ───────────────
+
+interface LocalEmbeddingModel {
+  embed: (texts: string[]) => Promise<number[][]>;
+}
+
+let localModelPromise: Promise<LocalEmbeddingModel> | null = null;
+
+/**
+ * Lazy-load the in-process model exactly once. The weights are bundled
+ * in the optional npm packages @energetic-ai/embeddings and
+ * @energetic-ai/model-embeddings-en, so first use needs no network.
+ */
+function getLocalModel(): Promise<LocalEmbeddingModel> {
+  if (!localModelPromise) {
+    localModelPromise = (async () => {
+      let embPkg: any;
+      let modelPkg: any;
+      try {
+        embPkg = (await import("@energetic-ai/embeddings")) as any;
+        modelPkg = (await import("@energetic-ai/model-embeddings-en")) as any;
+      } catch {
+        throw new Error(
+          "EMBEDDING_PROVIDER=local requires the optional local-embedding packages. " +
+            "Install them with: npm install @energetic-ai/embeddings @energetic-ai/model-embeddings-en"
+        );
+      }
+      const { initModel } = embPkg.default ?? embPkg;
+      const { modelSource } = modelPkg.default ?? modelPkg;
+      return initModel(modelSource);
+    })();
+  }
+  return localModelPromise;
+}
+
+/**
+ * Zero-pad a vector to EMBEDDING_DIM so it fits the vector(1024) schema.
+ * Appending zeros changes neither dot products against other padded
+ * vectors nor norms, so cosine similarity is preserved exactly.
+ */
+function padToDim(vec: number[]): number[] {
+  if (vec.length >= EMBEDDING_DIM) return vec.slice(0, EMBEDDING_DIM);
+  return vec.concat(new Array(EMBEDDING_DIM - vec.length).fill(0));
+}
+
+async function localEmbedBatch(texts: string[]): Promise<number[][]> {
+  const model = await getLocalModel();
+  const embeddings = await model.embed(texts);
+  return embeddings.map(padToDim);
+}
+
 // ─── Unified Interface ──────────────────────────────────
 
 /**
@@ -149,6 +208,15 @@ async function voyageEmbedQuery(text: string): Promise<number[]> {
  * Routes to Ollama or Voyage based on EMBEDDING_PROVIDER env.
  */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
+  if (EMBEDDING_PROVIDER === "local") {
+    const allEmbeddings: number[][] = [];
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      const batch = texts.slice(i, i + BATCH_SIZE);
+      allEmbeddings.push(...(await localEmbedBatch(batch)));
+    }
+    return allEmbeddings;
+  }
+
   if (EMBEDDING_PROVIDER === "voyage") {
     const allEmbeddings: number[][] = [];
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
@@ -182,6 +250,10 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
  * Uses input_type="query" for Voyage (optimized for search retrieval).
  */
 export async function embedQuery(text: string): Promise<number[]> {
+  if (EMBEDDING_PROVIDER === "local") {
+    const [embedding] = await localEmbedBatch([text]);
+    return embedding;
+  }
   if (EMBEDDING_PROVIDER === "voyage") {
     return voyageEmbedQuery(text);
   }

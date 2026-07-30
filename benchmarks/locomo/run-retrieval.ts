@@ -10,7 +10,11 @@
  * This isolates CORTEX's contribution (finding the right memory)
  * from the LLM's contribution (generating the answer).
  *
- * Usage: npx tsx benchmarks/locomo/run-retrieval.ts [--topk 10] [--skip-cat5]
+ * Usage: npx tsx benchmarks/locomo/run-retrieval.ts [--topk 10] [--skip-cat5] [--conv N]
+ *
+ * --conv N runs only the Nth conversation (1-based) and writes a
+ * per-conversation results file, so a full run can be resumed piecewise
+ * on interruptible infrastructure and merged afterward.
  */
 import { readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
@@ -71,6 +75,7 @@ function evidenceToSessionNums(evidence: string[]): number[] {
 const args = process.argv.slice(2);
 const topK = args.includes("--topk") ? parseInt(args[args.indexOf("--topk") + 1]) : 10;
 const skipCat5 = args.includes("--skip-cat5");
+const convArg = args.includes("--conv") ? parseInt(args[args.indexOf("--conv") + 1]) : 0;
 
 async function main() {
   console.log("============================================");
@@ -81,8 +86,17 @@ async function main() {
   console.log();
 
   const dataFile = join(__dirname, "locomo10.json");
-  const conversations: LoCoMoConversation[] = JSON.parse(readFileSync(dataFile, "utf-8"));
+  let conversations: LoCoMoConversation[] = JSON.parse(readFileSync(dataFile, "utf-8"));
   console.log(`Loaded ${conversations.length} conversations\n`);
+
+  if (convArg > 0) {
+    if (convArg > conversations.length) {
+      console.error(`--conv ${convArg} out of range (1-${conversations.length})`);
+      process.exit(1);
+    }
+    conversations = [conversations[convArg - 1]];
+    console.log(`Running only conversation ${convArg} (${conversations[0].sample_id})\n`);
+  }
 
   const agentId = await initBenchmark("locomo-retrieval");
   const allResults: QuestionResult[] = [];
@@ -188,12 +202,20 @@ async function main() {
   console.log("MemPalace (hybrid + Haiku): 88.9%");
   console.log(`CORTEX V2.4 (no LLM): ${(overall.recallAt10 * 100).toFixed(1)}%`);
 
-  // Save
-  const outputPath = join(__dirname, `results-retrieval-top${topK}.json`);
+  // Save (per-question results included so piecewise --conv runs can be merged)
+  const outputPath = join(
+    __dirname,
+    convArg > 0
+      ? `results-retrieval-top${topK}-conv${convArg}.json`
+      : `results-retrieval-top${topK}.json`
+  );
   writeFileSync(outputPath, JSON.stringify({
     benchmark: "LoCoMo (Retrieval Only)",
     system: "CORTEX V2.4",
+    conversation: convArg > 0 ? convArg : "all",
+    embeddingProvider: process.env.EMBEDDING_PROVIDER || "ollama",
     topK,
+    results: allResults,
     methodology: `Pure retrieval, no LLM. top_k=${topK} (honest, not bypassing retrieval). Same methodology as LongMemEval 500/500 run.`,
     timestamp: new Date().toISOString(),
     overall,
@@ -208,7 +230,11 @@ async function main() {
   console.log(`\nResults saved to ${outputPath}`);
 }
 
-main().catch(err => {
-  console.error("Benchmark failed:", err);
-  process.exit(1);
-});
+// Explicit exit: the postgres connection pool otherwise keeps the event
+// loop alive for minutes after the run completes, stalling batch scripts.
+main()
+  .then(() => process.exit(0))
+  .catch(err => {
+    console.error("Benchmark failed:", err);
+    process.exit(1);
+  });

@@ -208,7 +208,11 @@ async function main() {
   console.log(`\nResults saved to ${outputPath}`);
 }
 
-main().catch((err) => {
-  console.error("Benchmark failed:", err);
-  process.exit(1);
-});
+// Explicit exit: the postgres connection pool otherwise keeps the event
+// loop alive for minutes after the run completes, stalling batch scripts.
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Benchmark failed:", err);
+    process.exit(1);
+  });

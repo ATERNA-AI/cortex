@@ -118,7 +118,11 @@ Most agent memory systems store and retrieve. CORTEX **learns**.
 
 - Node.js 22+
 - PostgreSQL 15+ with [pgvector](https://github.com/pgvector/pgvector) extension
-- An embedding API key (VoyageAI recommended, OpenAI supported)
+- An embedding provider — one of:
+  - VoyageAI API key (recommended, best quality; used for all published benchmarks)
+  - Ollama running locally (`EMBEDDING_PROVIDER=ollama`)
+  - Nothing at all: `EMBEDDING_PROVIDER=local` runs in-process on CPU with
+    npm-bundled weights — zero keys, zero services, works offline
 
 ### Install
 
@@ -141,7 +145,8 @@ docker compose up
 ### Initialize Database
 
 ```bash
-npx tsx scripts/run-migrations.ts
+npm run db:push   # create the base schema (fresh databases)
+npm run migrate   # apply incremental migrations + production indexes
 ```
 
 ### Run the MCP Server

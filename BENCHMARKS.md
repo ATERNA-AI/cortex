@@ -10,6 +10,13 @@ Transparent, reproducible benchmark results. No hand-coded patches. No teaching 
 
 500 questions testing five core long-term memory abilities.
 
+> **Dataset variant:** the results below are on **`longmemeval_oracle`**, where each
+> question's haystack contains only its evidence-bearing sessions. The full
+> **`longmemeval_s`** variant (~50 sessions / ~115k tokens of haystack per question)
+> is a strictly harder retrieval problem; the runner supports it via
+> `--dataset s` (see [Reproduce](#reproduce)). We report the variant explicitly so
+> scores are never compared across different haystack sizes.
+
 | Metric | CORTEX V2.4 |
 |--------|------------|
 | **Recall@1** | **100.0%** |
@@ -107,14 +114,36 @@ git clone https://github.com/Rezzyman/cortex.git
 cd cortex && npm install && cp .env.example .env
 # Add DATABASE_URL + VOYAGE_API_KEY
 
-# LongMemEval
+# LongMemEval (oracle variant — matches the table above)
 curl -sL https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json -o benchmarks/longmemeval/longmemeval_oracle.json
 npx tsx benchmarks/longmemeval/run.ts --topk 10 --dataset oracle
+
+# LongMemEval (full haystack variant — harder, report separately)
+curl -sL https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s.json -o benchmarks/longmemeval/longmemeval_s.json
+npx tsx benchmarks/longmemeval/run.ts --topk 10 --dataset s
 
 # LoCoMo
 curl -sL https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json -o benchmarks/locomo/locomo10.json
 npx tsx benchmarks/locomo/run-retrieval.ts --topk 10
 ```
+
+### Reproducing without API keys
+
+Every published number above was produced with Voyage-3 embeddings. If you don't
+have a Voyage key, the entire harness also runs fully offline:
+
+```bash
+# .env
+DATABASE_URL="postgresql://cortex:cortex@localhost:5432/cortex"
+EMBEDDING_PROVIDER="local"   # in-process CPU model, npm-bundled weights
+```
+
+This exercises the identical pipeline — chunking, ingestion, pgvector storage,
+hybrid 7-factor search, scoring — with zero external services, so it's ideal for
+CI, air-gapped environments, and kicking the tires. **Scores from the local
+provider are not comparable to the Voyage-3 numbers above** (smaller 512-dim
+model, zero-padded to 1024); treat them as a lower bound and a harness
+validation, not a leaderboard entry.
 
 ---
 
