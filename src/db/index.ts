@@ -30,9 +30,16 @@ const patchedDb = rawDb as unknown as CortexDb;
 (patchedDb as any).execute = async (query: SQL): Promise<NeonCompatResult> => {
   const result = await origExecute(query);
   const arr = Array.isArray(result) ? [...result] : [];
+  // postgres-js exposes affected-row count on `.count` — essential for
+  // UPDATE/DELETE without RETURNING, where the row array is empty (arr.length
+  // would be 0). Prefer `.count`; fall back to arr.length for other drivers.
+  const affected =
+    typeof (result as any)?.count === "number"
+      ? (result as any).count
+      : arr.length;
   return Object.assign(result, {
     rows: arr,
-    rowCount: arr.length,
+    rowCount: affected,
   }) as unknown as NeonCompatResult;
 };
 
@@ -41,6 +48,22 @@ export const db = patchedDb;
 // Enable pgvector extension on first connection + schema migrations
 export async function initDatabase() {
   await client`CREATE EXTENSION IF NOT EXISTS vector`;
+  // Append-only admission ledger. Stores provenance and digests, never raw
+  // rejected content, so poisoning attempts remain auditable without becoming
+  // another executable-memory surface.
+  await client`CREATE TABLE IF NOT EXISTS memory_admission_events (
+    id BIGSERIAL PRIMARY KEY,
+    agent_external_id VARCHAR(255) NOT NULL,
+    principal VARCHAR(255) NOT NULL,
+    trust VARCHAR(32) NOT NULL,
+    authority VARCHAR(32) NOT NULL,
+    content_sha256 CHAR(64) NOT NULL,
+    admitted BOOLEAN NOT NULL,
+    reason VARCHAR(128),
+    source VARCHAR(512),
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL
+  )`;
+  await client`CREATE INDEX IF NOT EXISTS idx_admission_agent_created ON memory_admission_events(agent_external_id, created_at DESC)`;
   // Build 1: novelty_score for surprise-gated ingestion
   await client`ALTER TABLE memory_nodes ADD COLUMN IF NOT EXISTS novelty_score REAL DEFAULT NULL`;
   // Build 3: last_recalled_at for memory reconsolidation

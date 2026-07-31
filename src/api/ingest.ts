@@ -4,48 +4,77 @@ import { chunkText } from "../ingestion/chunker.js";
 import { embedTexts } from "../ingestion/embeddings.js";
 import { extractEntities, extractSemanticTags } from "../ingestion/entities.js";
 import { formSynapses } from "../ingestion/synapse-formation.js";
+import { sanitizeText } from "./extract.js";
 import { hippocampalEncode } from "../hippocampus/index.js";
 import { analyzeValence } from "../valence/index.js";
 import { eq, sql } from "drizzle-orm";
+import { evaluateAdmission, type CortexTrust } from "./security.js";
 
 const router = Router();
 
+export interface IngestArgs {
+  agentId: string;
+  content: string;
+  source?: string | null;
+  sourceType?: string;
+  priority?: number;
+  entities?: string[];
+  semanticTags?: string[];
+  principal?: string;
+  trust?: CortexTrust;
+}
+
 /**
- * POST /api/v1/ingest
- * Body: { agentId, content, source?, sourceType?, priority?, entities?, semanticTags? }
- *
- * Ingests new content: chunks → embeds → stores → forms synapses.
+ * Core ingestion pipeline: chunks → embeds → stores → forms synapses.
+ * Shared by POST /api/v1/ingest and POST /api/v1/ingest/file.
+ * Throws { status, message } on validation/lookup failure.
  */
-router.post("/", async (req: Request, res: Response) => {
-  try {
-    const {
-      agentId,
-      content,
-      source,
-      sourceType = "api",
-      priority = 2,
-      entities: providedEntities,
-      semanticTags: providedTags,
-    } = req.body;
+export async function ingestContent(args: IngestArgs) {
+  const {
+    agentId,
+    content,
+    source,
+    sourceType = "api",
+    priority = 2,
+    entities: providedEntities,
+    semanticTags: providedTags,
+    principal = "unknown",
+    trust = "external",
+  } = args;
 
-    if (!agentId || !content) {
-      res.status(400).json({ error: "agentId and content required" });
-      return;
-    }
+  if (!agentId || !content) {
+    throw { status: 400, message: "agentId and content required" };
+  }
 
-    // Resolve agent
-    const [agent] = await db
-      .select()
-      .from(schema.agents)
-      .where(eq(schema.agents.externalId, agentId));
+  const admission = evaluateAdmission(content, trust);
+  await db.execute(sql`
+    INSERT INTO memory_admission_events
+      (agent_external_id, principal, trust, authority, content_sha256, admitted, reason, source)
+    VALUES
+      (${agentId}, ${principal}, ${trust}, ${admission.authority}, ${admission.digest},
+       ${admission.admitted}, ${admission.reason || null}, ${source || null})
+  `);
+  if (!admission.admitted) {
+    console.warn(`[admission] quarantined principal=${principal} digest=${admission.digest} reason=${admission.reason}`);
+    throw { status: 422, message: "Content quarantined by memory admission policy" };
+  }
 
-    if (!agent) {
-      res.status(404).json({ error: `Agent '${agentId}' not found` });
-      return;
-    }
+  // Resolve agent
+  const [agent] = await db
+    .select()
+    .from(schema.agents)
+    .where(eq(schema.agents.externalId, agentId));
 
-    // Chunk content
-    const chunks = chunkText(content);
+  if (!agent) {
+    throw { status: 404, message: `Agent '${agentId}' not found` };
+  }
+
+  // Defensive: strip NUL/control bytes that Postgres TEXT rejects, so no
+  // ingest path (PDF/DOCX/text/api) can ever fail the insert again.
+  const safeContent = sanitizeText(content);
+
+  // Chunk content
+    const chunks = chunkText(safeContent);
 
     // Embed all chunks
     const embeddings = await embedTexts(chunks.map((c) => c.text));
@@ -66,7 +95,7 @@ router.post("/", async (req: Request, res: Response) => {
           agentId: agent.id,
           content: chunks[i].text,
           source: source || null,
-          sourceType,
+          sourceType: admission.authority === "evidence" ? `evidence:${sourceType}` : sourceType,
           chunkIndex: chunks[i].index,
           embedding: embeddings[i],
           entities: providedEntities
@@ -116,16 +145,34 @@ router.post("/", async (req: Request, res: Response) => {
       insertedIds.push(inserted.id);
     }
 
-    // Form synapses
-    const synapsesFormed = await formSynapses(agent.id, insertedIds);
+  // Form synapses
+  const synapsesFormed = await formSynapses(agent.id, insertedIds);
 
-    res.json({
-      agentId,
-      chunksStored: insertedIds.length,
-      nodeIds: insertedIds,
-      synapsesFormed,
+  return {
+    agentId,
+    chunksStored: insertedIds.length,
+    nodeIds: insertedIds,
+    synapsesFormed,
+  };
+}
+
+/**
+ * POST /api/v1/ingest
+ * Body: { agentId, content, source?, sourceType?, priority?, entities?, semanticTags? }
+ */
+router.post("/", async (req: Request, res: Response) => {
+  try {
+    const result = await ingestContent({
+      ...(req.body || {}),
+      principal: req.cortexPrincipal?.id,
+      trust: req.cortexPrincipal?.trust,
     });
-  } catch (err) {
+    res.json(result);
+  } catch (err: any) {
+    if (err && err.status) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
     console.error("[ingest] Error:", err);
     res.status(500).json({ error: "Ingestion failed" });
   }

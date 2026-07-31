@@ -119,7 +119,7 @@ export async function runDreamCycle(
 
       // ─── Phase 5: Synthesis ────────────────────────────
       console.log("[dream] Phase 5 [REM]: Synthesis");
-      const synthesisResult = await phaseSynthesis(agentId, 24);
+      const synthesisResult = await phaseSynthesis(agentId, 72);
       stats.phase5_synthesesCreated = synthesisResult.synthesesCreated;
       insights.push(...synthesisResult.insights);
     }
@@ -594,7 +594,7 @@ async function phaseFreeAssociation(agentId: number): Promise<{
     const j = Math.floor(Math.random() * (i + 1));
     [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
   }
-  const sampledPairs = pairs.slice(0, 200);
+  const sampledPairs = pairs.slice(0, 400);
 
   for (const [i, j] of sampledPairs) {
     const nodeA = nodes[i];
@@ -611,9 +611,10 @@ async function phaseFreeAssociation(agentId: number): Promise<{
 
     const similarity = simResult?.similarity || 0;
 
-    // Novel connection range: 0.6-0.85
-    // (too low = unrelated, too high = already connected or obvious)
-    if (similarity >= 0.6 && similarity <= 0.85) {
+    // Novel connection range: 0.45-0.9
+    // Widened 2026-06-23: corpus grew broad/diverse (avg pair sim ~0.32), so the
+    // old 0.6-0.85 band qualified only ~0.3% of pairs and starved synthesis.
+    if (similarity >= 0.45 && similarity <= 0.9) {
       // Check if a semantic synapse already exists (other types don't block novel discovery)
       const existing = await db.execute(sql`
         SELECT id FROM memory_synapses
@@ -630,13 +631,16 @@ async function phaseFreeAssociation(agentId: number): Promise<{
           Math.max(nodeA.id, nodeB.id),
         ];
 
-        await db.insert(schema.memorySynapses).values({
-          memoryA: memA,
-          memoryB: memB,
-          connectionType: "semantic",
-          connectionStrength: 0.2 + (similarity - 0.6) * 0.4, // 0.2-0.3
-          decayRate: 0.02,
-        });
+        await db
+          .insert(schema.memorySynapses)
+          .values({
+            memoryA: memA,
+            memoryB: memB,
+            connectionType: "semantic",
+            connectionStrength: 0.2 + (similarity - 0.45) * 0.3, // 0.20-0.34, recalibrated for the widened 0.45-0.9 band (stays in Phase 5's 0.2-0.4 window)
+            decayRate: 0.02,
+          })
+          .onConflictDoNothing();
 
         novelSynapses++;
 
@@ -690,13 +694,16 @@ async function phaseFreeAssociation(agentId: number): Promise<{
           `);
 
           if (existing.rows.length === 0) {
-            await db.insert(schema.memorySynapses).values({
-              memoryA: memA,
-              memoryB: memB,
-              connectionType: "semantic",
-              connectionStrength: 0.15 + overlap * 0.3,
-              decayRate: 0.02,
-            });
+            await db
+              .insert(schema.memorySynapses)
+              .values({
+                memoryA: memA,
+                memoryB: memB,
+                connectionType: "semantic",
+                connectionStrength: 0.15 + overlap * 0.3,
+                decayRate: 0.02,
+              })
+              .onConflictDoNothing();
             novelSynapses++;
           }
         }

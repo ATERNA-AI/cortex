@@ -38,22 +38,23 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
-// Helper: resolve agent by external ID, create if missing
+// MCP is a local compatibility surface, not a multi-tenant identity authority.
+// Bind every tool to the configured agent and never auto-create identities.
 async function resolveAgent(externalId: string): Promise<number> {
-  let [agent] = await db
+  const configured = process.env.CORTEX_DEFAULT_AGENT;
+  if (!configured) throw new Error("CORTEX_DEFAULT_AGENT is required");
+  // Older tool schemas default to "arlo"; treat only that legacy default as
+  // omitted. Any other explicit cross-agent request fails closed.
+  if (externalId && externalId !== "arlo" && externalId !== configured) {
+    throw new Error("agent_scope_violation");
+  }
+  const [agent] = await db
     .select()
     .from(schema.agents)
-    .where(eq(schema.agents.externalId, externalId));
+    .where(eq(schema.agents.externalId, configured));
 
   if (!agent) {
-    [agent] = await db
-      .insert(schema.agents)
-      .values({
-        externalId,
-        name: externalId.charAt(0).toUpperCase() + externalId.slice(1),
-        ownerId: "rez",
-      })
-      .returning();
+    throw new Error(`Configured agent '${configured}' not found`);
   }
 
   return agent.id;
