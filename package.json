@@ -47,19 +47,19 @@
     "url": "https://github.com/aterna-ai/cortex/issues"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
+    "@anthropic-ai/sdk": "^0.115.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@neondatabase/serverless": "^0.10.4",
     "chokidar": "^4.0.3",
     "commander": "^13.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "drizzle-orm": "^0.38.4",
+    "drizzle-orm": "^0.45.2",
     "express": "^4.21.2",
     "gpt-tokenizer": "^2.8.1",
     "openai": "^6.33.0",
     "postgres": "^3.4.8",
-    "voyageai": "^0.0.3-1",
+    "voyageai": "^0.4.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
