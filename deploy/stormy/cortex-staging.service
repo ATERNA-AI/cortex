@@ -2,6 +2,8 @@
 Description=Stormy governed CORTEX staging
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -16,8 +18,6 @@ Environment=CORTEX_UPLOAD_DIR=/var/lib/stormy-cortex/uploads
 ExecStart=/usr/bin/node dist/index.js
 Restart=on-failure
 RestartSec=10
-StartLimitIntervalSec=300
-StartLimitBurst=5
 TimeoutStartSec=60
 TimeoutStopSec=30
 NoNewPrivileges=true
@@ -31,7 +31,6 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictRealtime=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
 ReadWritePaths=/var/lib/stormy-cortex/uploads
 UMask=0077
 
