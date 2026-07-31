@@ -1,0 +1,15 @@
+[Unit]
+Description=Back up and verify Stormy CORTEX database
+
+[Service]
+Type=oneshot
+User=stormy
+Group=stormy
+EnvironmentFile=/etc/aterna/stormy-cortex.env
+ExecStart=/opt/aterna/stormy/cortex-current/deploy/stormy/cortex-backup.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/stormy-cortex
+UMask=0077

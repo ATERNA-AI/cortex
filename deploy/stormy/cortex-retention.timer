@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily Stormy CORTEX upload retention
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Stormy CORTEX upload retention
+
+[Service]
+Type=oneshot
+User=stormy
+Group=stormy
+EnvironmentFile=/etc/aterna/stormy-cortex.env
+ExecStart=/usr/bin/find /var/lib/stormy-cortex/uploads -type f -mtime +90 -delete
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/stormy-cortex/uploads

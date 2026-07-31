@@ -135,19 +135,17 @@ app.get("/", (_req, res) => {
 // Start
 async function start() {
   assertRequiredEnvironment();
-  try {
-    await initDatabase();
-    console.log("[cortex] Database connected");
-  } catch (err) {
-    console.error("[cortex] Database connection failed:", err);
-    console.log("[cortex] Starting without database — some endpoints will fail");
-  }
+  await initDatabase();
+  console.log("[cortex] Database connected");
 
   app.listen(PORT, HOST, () => {
     console.log(`[cortex] CORTEX V2 running on http://${HOST}:${PORT}`);
   });
 }
 
-start();
+start().catch((err) => {
+  console.error("[cortex] Fatal startup failure:", err instanceof Error ? err.message : "unknown error");
+  process.exit(1);
+});
 
 export default app;

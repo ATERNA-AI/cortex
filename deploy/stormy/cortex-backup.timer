@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Stormy CORTEX backup
+
+[Timer]
+OnCalendar=*-*-* 05:15:00 UTC
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target
