@@ -44,10 +44,22 @@ async function hybridSearch(
   // Get query embedding
   const queryEmbedding = await embedQuery(query);
   const embeddingStr = `[${queryEmbedding.join(",")}]`;
+  const candidateLimit = Math.max(200, Math.min(1000, limit * 10));
 
-  // Single query combining vector similarity + text matching + scoring
+  // Pull a bounded nearest-neighbor candidate set first. Scoring every active
+  // memory forced a full scan and made Stormy's 70k+ corpus exceed interactive
+  // timeouts despite the HNSW index.
   const results = await db.execute(sql`
-    WITH vector_scores AS (
+    WITH candidates AS MATERIALIZED (
+      SELECT id, content, source, source_type, priority, resonance_score,
+             entities, semantic_tags, created_at, embedding
+      FROM memory_nodes
+      WHERE agent_id = ${agentId}
+        AND status = 'active'
+        AND embedding IS NOT NULL
+      ORDER BY embedding <=> ${embeddingStr}::vector
+      LIMIT ${candidateLimit}
+    ), vector_scores AS (
       SELECT
         id,
         content,
@@ -76,10 +88,7 @@ async function hybridSearch(
           WHEN 4 THEN 0.1
           ELSE 0.5
         END AS priority_boost
-      FROM memory_nodes
-      WHERE agent_id = ${agentId}
-        AND status = 'active'
-        AND embedding IS NOT NULL
+      FROM candidates
     )
     SELECT vs.*,
       COALESCE(ev.recall_boost, 0) AS emotional_boost,

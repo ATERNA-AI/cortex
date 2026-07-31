@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export HOME=/tmp
 
 backup_dir=/var/backups/stormy-cortex
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
