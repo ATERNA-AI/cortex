@@ -15,7 +15,7 @@ Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=PORT=3111
 Environment=CORTEX_UPLOAD_DIR=/var/lib/stormy-cortex/uploads
-ExecStart=/usr/bin/node dist/index.js
+ExecStart=/usr/bin/node dist/src/index.js
 Restart=on-failure
 RestartSec=10
 TimeoutStartSec=60
