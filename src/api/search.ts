@@ -107,13 +107,15 @@ async function hybridSearch(
   // ── CA3 Pattern Completion ──
   // Run autoassociative recall in parallel with hybrid results
   let ca3Results: Map<number, number> = new Map();
-  try {
-    const completions = await patternComplete(agentId, queryEmbedding, limit);
-    for (const c of completions) {
-      ca3Results.set(c.memoryId, c.activationScore);
+  if (process.env.CORTEX_CA3_RECALL_ENABLED !== "false") {
+    try {
+      const completions = await patternComplete(agentId, queryEmbedding, limit);
+      for (const c of completions) {
+        ca3Results.set(c.memoryId, c.activationScore);
+      }
+    } catch {
+      // CA3 is additive — if it fails (e.g., no hippocampal codes yet), hybrid still works
     }
-  } catch {
-    // CA3 is additive — if it fails (e.g., no hippocampal codes yet), hybrid still works
   }
 
   // NOTE (2026-04-10): Access-count telemetry and markLabile are now split
