@@ -1,7 +1,7 @@
 /**
  * Backfill hippocampal codes for memories that have embeddings but no DG encoding.
  *
- * Run: npx tsx scripts/backfill-hippocampal.ts [--agent arlo] [--batch 500] [--dry-run]
+ * Run: npx tsx scripts/backfill-hippocampal.ts [--agent my-agent] [--batch 500] [--dry-run]
  *
  * This is a one-time operation to encode the existing corpus through the
  * Dentate Gyrus sparse coding pipeline. New memories get encoded at ingest time.

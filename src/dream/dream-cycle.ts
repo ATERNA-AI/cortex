@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { sparseOverlap } from "../hippocampus/index.js";
 import type { SparseCode } from "../hippocampus/types.js";
 import "dotenv/config";
+import { defaultAgentId } from "../default-agent.js";
 
 interface DreamStats {
   phase1_resonanceUpdated: number;
@@ -804,7 +805,7 @@ if (
   process.argv[1]?.endsWith("dream-cycle.ts") ||
   process.argv[1]?.endsWith("dream-cycle.js")
 ) {
-  const agentExternalId = process.argv[2] || "arlo";
+  const agentExternalId = process.argv[2] || defaultAgentId();
   const cycleType = process.argv[3] || "full";
 
   (async () => {
