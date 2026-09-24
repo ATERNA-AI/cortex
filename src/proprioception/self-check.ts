@@ -1,7 +1,7 @@
 /**
  * CORTEX V2 — Proprioception: Self-Check
  *
- * Runs diagnostics on Arlo's operational health:
+ * Runs diagnostics on the agent's operational health:
  * - Skill file integrity
  * - Cron job status (overdue/failed)
  * - Channel connectivity

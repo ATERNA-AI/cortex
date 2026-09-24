@@ -9,6 +9,7 @@ import { hippocampalEncode } from "../hippocampus/index.js";
 import { analyzeValence } from "../valence/index.js";
 import { eq, and, sql } from "drizzle-orm";
 import "dotenv/config";
+import { defaultAgentId } from "../default-agent.js";
 
 interface IngestOptions {
   agentId: number;
@@ -273,7 +274,7 @@ export async function ingestCorpus(agentId: number): Promise<void> {
 
 // CLI entry point
 if (process.argv[1]?.endsWith("ingest-markdown.ts") || process.argv[1]?.endsWith("ingest-markdown.js")) {
-  const agentExternalId = process.argv[2] || "arlo";
+  const agentExternalId = process.argv[2] || defaultAgentId();
 
   (async () => {
     const { initDatabase } = await import("../db/index.js");

@@ -32,6 +32,9 @@ import { reconsolidate, getLabileMemories } from "../reconsolidation/index.js";
 import { storeProcedural, retrieveProcedural, recordExecution, refineProcedural } from "../procedural/index.js";
 import { eq, sql, desc, and } from "drizzle-orm";
 import "dotenv/config";
+import { defaultAgentId } from "../default-agent.js";
+
+const DEFAULT_AGENT_ID = defaultAgentId();
 
 const server = new McpServer({
   name: "cortex-v2",
@@ -67,8 +70,8 @@ server.tool(
     query: z.string().describe("The search query"),
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
     limit: z
       .number()
       .default(10)
@@ -211,8 +214,8 @@ server.tool(
     query: z.string().describe("What to recall context about"),
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
     token_budget: z
       .number()
       .default(4000)
@@ -313,8 +316,8 @@ server.tool(
   {
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
   },
   async ({ agent_id }) => {
     const agentId = await resolveAgent(agent_id);
@@ -440,8 +443,8 @@ server.tool(
     content: z.string().describe("The content to store in memory"),
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
     source: z
       .string()
       .optional()
@@ -508,8 +511,8 @@ server.tool(
     file_path: z.string().describe("Absolute path to the file to ingest"),
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
     source_type: z
       .string()
       .default("markdown")
@@ -542,8 +545,8 @@ server.tool(
   {
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
   },
   async ({ agent_id }) => {
     const agentId = await resolveAgent(agent_id);
@@ -581,8 +584,8 @@ server.tool(
   {
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
     cycle_type: z
       .enum(["full", "resonance_only", "pruning_only", "consolidation_only"])
       .default("full")
@@ -610,8 +613,8 @@ server.tool(
   {
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
   },
   async ({ agent_id }) => {
     const agentId = await resolveAgent(agent_id);
@@ -694,8 +697,8 @@ server.tool(
   {
     agent_id: z
       .string()
-      .default("arlo")
-      .describe("Agent ID (default: arlo)"),
+      .default(DEFAULT_AGENT_ID)
+      .describe("Agent ID (default: CORTEX_DEFAULT_AGENT_ID or \"default\")"),
     artifact_type: z
       .enum(["decision", "learning", "correction", "insight"])
       .describe("Type of cognitive artifact"),
@@ -735,7 +738,7 @@ server.tool(
   "cortex_self_check",
   "Run a self-diagnostic check on the agent's operational health. Checks skills, cron jobs, channels, and behavioral drift. Use during heartbeats or when something feels off.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     verbose: z.boolean().default(false).describe("Include detailed drift indicators"),
   },
   async ({ agent_id, verbose }) => {
@@ -750,7 +753,7 @@ server.tool(
   "cortex_journal",
   "Log an agent state journal entry. Record current energy, confidence, concerns, and notes for self-awareness tracking.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     energy_state: z.enum(["high", "normal", "low", "depleted"]).default("normal").describe("Current energy level"),
     confidence: z.number().min(0).max(1).default(0.5).describe("Current confidence (0-1)"),
     active_threads: z.array(z.string()).default([]).describe("Currently active work threads"),
@@ -777,7 +780,7 @@ server.tool(
   "cortex_assess_state",
   "Assess the principal's current state (energy, stress, focus) from recent message patterns and context. Returns communication guidance.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     recent_messages: z.array(z.string()).describe("Recent messages from the principal to analyze"),
     time_of_day: z.string().optional().describe("Current time (HH:MM format)"),
     calendar_context: z.string().optional().describe("Upcoming calendar context"),
@@ -794,7 +797,7 @@ server.tool(
   "cortex_state_history",
   "Get recent history of the principal's assessed states. Useful for understanding trends and patterns.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     hours: z.number().default(24).describe("How many hours back to look"),
   },
   async ({ agent_id, hours }) => {
@@ -809,7 +812,7 @@ server.tool(
   "cortex_bg_thread",
   "Run a background reasoning thread. Strategic analyzes gaps and alignment. Operational checks system health. Relational tracks contact freshness.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     thread_type: z.enum(["strategic", "operational", "relational"]).describe("Type of reasoning thread"),
   },
   async ({ agent_id, thread_type }) => {
@@ -825,7 +828,7 @@ server.tool(
   "cortex_synthesize",
   "Run synthesis on recent novel synapses to discover unexpected connections and generate insights.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     hours: z.number().default(24).describe("How many hours of novel synapses to analyze"),
   },
   async ({ agent_id, hours }) => {
@@ -844,7 +847,7 @@ server.tool(
   "cortex_observe",
   "Capture and analyze the current screen state. Detects active app, window title, and visible content. Use for contextual awareness of what the principal is working on.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     store: z.boolean().default(true).describe("Store observation in memory (false = describe only)"),
   },
   async ({ agent_id, store }) => {
@@ -864,7 +867,7 @@ server.tool(
   "cortex_relationship",
   "Look up a person's relationship profile. Returns communication preferences, open items, contact history, and personality model.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     name: z.string().describe("Person's name (fuzzy matched)"),
   },
   async ({ agent_id, name }) => {
@@ -880,7 +883,7 @@ server.tool(
   "cortex_relationships",
   "List all relationships, optionally filtered by type or showing only overdue contacts.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     type: z.string().optional().describe("Filter by type: family, client, partner, vendor, friend, professional"),
     overdue_only: z.boolean().default(false).describe("Only show overdue contacts"),
   },
@@ -896,7 +899,7 @@ server.tool(
   "cortex_relationship_update",
   "Update a relationship profile. Set last contact, add notes, add/resolve open items.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     name: z.string().describe("Person's name"),
     last_contact: z.string().optional().describe("Set last contact ('now' or ISO date)"),
     note: z.string().optional().describe("Update notes"),
@@ -931,7 +934,7 @@ server.tool(
   "cortex_reason",
   "Store a reasoning trace for a significant decision. Records the decision, options considered, rationale, and confidence.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     decision: z.string().describe("What was decided"),
     context: z.string().describe("Context/situation"),
     options: z.array(z.object({
@@ -959,7 +962,7 @@ server.tool(
   "cortex_audit",
   "Run a weekly reasoning audit. Analyzes recent reasoning traces for consistency, confidence calibration, bias, and alignment with core values.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     period: z.string().optional().describe("Period label (e.g. '2026-W07')"),
   },
   async ({ agent_id, period }) => {
@@ -974,7 +977,7 @@ server.tool(
   "cortex_monologue",
   "Record an inner monologue entry. For observations, reflections, and self-directed thoughts.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     content: z.string().describe("The thought or observation"),
     context: z.string().optional().describe("What triggered this thought"),
   },
@@ -990,7 +993,7 @@ server.tool(
   "cortex_reconsolidate",
   "Update a previously recalled memory with new information. The memory must have been recalled within the last hour (labile window). Use this to correct beliefs, update outdated information, or refine knowledge. The original content is preserved as an audit trail.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     memory_id: z.number().describe("ID of the memory to update (must have been recently recalled)"),
     new_content: z.string().describe("The updated memory content"),
     reason: z.string().default("belief_update").describe("Why the memory is being updated (e.g., correction, expansion, refinement, belief_update)"),
@@ -1022,7 +1025,7 @@ server.tool(
   "cortex_labile",
   "List all currently labile (modifiable) memories. These are memories recalled in the last hour that can be updated via cortex_reconsolidate.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
   },
   async ({ agent_id }) => {
     const agentId = await resolveAgent(agent_id);
@@ -1047,7 +1050,7 @@ server.tool(
   "cortex_skill_store",
   "Store a new procedural memory (skill, workflow, pattern, preference, or heuristic). Use this when you learn HOW to do something, identify a repeatable process, or discover a pattern that should be remembered as a capability.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     name: z.string().describe("Short name for the skill/workflow (e.g., 'Client proposal writing')"),
     description: z.string().describe("Detailed description of how to execute this"),
     procedural_type: z.enum(["skill", "workflow", "pattern", "preference", "heuristic"]).describe("Type of procedural knowledge"),
@@ -1072,7 +1075,7 @@ server.tool(
   "cortex_skill_retrieve",
   "Retrieve relevant skills, workflows, or patterns for a given task. Use this BEFORE starting a task to check if you already know how to do it.",
   {
-    agent_id: z.string().default("arlo").describe("Agent ID"),
+    agent_id: z.string().default(DEFAULT_AGENT_ID).describe("Agent ID"),
     task_context: z.string().describe("Describe the task you're about to do"),
     limit: z.number().default(5).describe("Max results"),
   },

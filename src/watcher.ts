@@ -5,6 +5,7 @@ import { ingestLimitlessFile } from "./ingestion/ingest-limitless.js";
 import { initDatabase, db, schema } from "./db/index.js";
 import { eq } from "drizzle-orm";
 import "dotenv/config";
+import { defaultAgentId } from "./default-agent.js";
 
 const DEBOUNCE_MS = 5 * 60 * 1000; // 5 minutes
 const pendingIngests = new Map<string, NodeJS.Timeout>();
@@ -17,7 +18,7 @@ const pendingIngests = new Map<string, NodeJS.Timeout>();
 async function startWatcher() {
   await initDatabase();
 
-  const agentExternalId = process.argv[2] || "arlo";
+  const agentExternalId = process.argv[2] || defaultAgentId();
   const workspace =
     process.env.CORTEX_WORKSPACE || process.cwd();
 

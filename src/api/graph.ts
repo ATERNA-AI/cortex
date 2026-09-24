@@ -59,7 +59,7 @@ function mapSourceType(sourceType: string): string {
 }
 
 /**
- * GET /api/v1/graph?agentId=arlo&limit=15000
+ * GET /api/v1/graph?agentId=my-agent&limit=15000
  *
  * Returns the full memory graph for 3D visualization.
  */
