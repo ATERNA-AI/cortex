@@ -1,3 +1,5 @@
+> **Archived, October 2026.** This repository is a frozen public snapshot. CORTEX is now developed privately by ATERNA and ships inside every ATERNA agent; teams building their own agents can license the production engine as Quartz. Learn more at [aterna.ai/cortex](https://aterna.ai/cortex) and [aterna.ai/quartz](https://aterna.ai/quartz).
+
 # CORTEX
 
 **Synthetic cognition infrastructure for AI agents.**
